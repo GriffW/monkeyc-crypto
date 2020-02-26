@@ -34,32 +34,36 @@ module Crypto
     // - text_in    [str]   string to encrypt
     // - key_in     [bytes] key to encrypt data with
     // returns:
-    // - [bytes]    encrypted data
-    function encrypt( iv_in, text_in, key_in )
+    // - [bytes]    encrypted cypher text
+    function encrypt( text_in, key_in )
     {
-        var b_array = []b;
         var text_to_encrypt = AESPadData( text_in );
-        b_array.addAll( text_to_encrypt );
+        var generated_iv    = Cryptography.randomBytes( IV_SIZE_BYTES );
 
         var aes_256_cipher = new Cryptography.Cipher(
             {
                 :algorithm    => Cryptography.CIPHER_AES256,
                 :mode         => Cryptography.MODE_CBC,
                 :key          => key_in,
-                :iv           => iv_in
+                :iv           => generated_iv
             });
 
-        var ecd = aes_256_cipher.encrypt( b_array );
-        ecd.addAll( iv_in );
-        return ecd;
+        var encrypted_data = aes_256_cipher.encrypt( []b.addAll( text_to_encrypt ) );
+
+        return generated_iv.addAll( encrypted_data );
     }
 
-    function decrypt( data_in, key_in )
+    // desc: decrypts plain text
+    // inputs:
+    // - encrypted_data_in  [bytes] string to decrypt
+    // - key_in             [bytes] key to encrypt data with
+    // returns:
+    // - [bytes]    decrypted cypher text
+    function decrypt( encrypted_data_in, key_in )
     {
         //get iv
-        var iv_index = data_in.size() - IV_SIZE_BYTES;
-        var data_iv = data_in.slice( iv_index, null );
-        var ecd = data_in.slice( 0, iv_index );
+        var data_iv         = encrypted_data_in.slice( 0, IV_SIZE_BYTES );
+        var encrypted_data  = encrypted_data_in.slice( IV_SIZE_BYTES, encrypted_data_in.size() );
 
         var aes_256_cipher = new Cryptography.Cipher(
             {
@@ -69,17 +73,9 @@ module Crypto
                 :iv           => data_iv
             } );
 
-        var dcd = aes_256_cipher.decrypt( ecd );
+        var decrypted_data = aes_256_cipher.decrypt( encrypted_data );
+        var padding_length = decrypted_data[decrypted_data.size() - 1];
 
-        var padding_length = dcd[dcd.size() - 1];
-        dcd = dcd.slice( null, -padding_length );
-
-        var text = "";
-        for( var i = 0; i < dcd.size(); ++i )
-        {
-           text += dcd[i].toChar();
-        }
-
-        return dcd;
+        return decrypted_data.slice( 0, -padding_length );
     }
 }

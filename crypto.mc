@@ -1,9 +1,11 @@
-using Toybox.Cryptography as Cryptography;
+using Toybox.Cryptography   as Cryptography;
+using Toybox.StringUtil     as StrUtl;
 
 module Crypto
 {
-    const BLOCK_SIZE_BYTES  = 32;
-    const IV_SIZE_BYTES     = 16;
+    const BLOCK_SIZE_BYTES      = 32;
+    const IV_SIZE_BYTES         = 16;
+    const KDF_SALT_SIZE_BITS    = 128;
 
     // desc: adds padding to AES
     // inputs:
@@ -77,5 +79,25 @@ module Crypto
         var padding_length = decrypted_data[decrypted_data.size() - 1];
 
         return decrypted_data.slice( 0, -padding_length );
+    }
+
+    function kdf( password_in )
+    {
+        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BITS / 8 );
+        var sha_256 = new Cryptography.Hash(
+            {
+                :algorithm => Cryptography.HASH_SHA256
+            } );
+
+        var password_bytes = StrUtl.convertEncodedString( password_in,
+            {
+                :fromRepresentation => StrUtl.REPRESENTATION_STRING_PLAIN_TEXT,
+                :toRepresentation   => StrUtl.REPRESENTATION_BYTE_ARRAY,
+            } );
+        var input = password_bytes.addAll( kdf_salt );
+        sha_256.update( input );
+        var key = sha_256.digest();
+
+        return [kdf_salt, key];
     }
 }

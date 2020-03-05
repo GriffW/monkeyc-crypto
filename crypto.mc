@@ -3,9 +3,18 @@ using Toybox.StringUtil     as StrUtl;
 
 module Crypto
 {
+    enum
+    {
+        KDF_RET_KEY,
+        KDF_RET_SALT,
+        KDF_RET_SIZE
+    }
+
     const BLOCK_SIZE_BYTES      = 32;
     const IV_SIZE_BYTES         = 16;
-    const KDF_SALT_SIZE_BITS    = 128;
+    const KDF_SALT_SIZE_BYTES   = 16;
+
+    const PBKDF2_HMAC_ITERATIONS = 10000;
 
     // desc: adds padding to AES
     // inputs:
@@ -81,13 +90,25 @@ module Crypto
         return decrypted_data.slice( 0, -padding_length );
     }
 
+    // desc: generates a cryptographically secure key from a passphrase
+    // inputs:
+    // - password_in  [string]  string to turn into a key
+    // returns:
+    // - [[bytes], [bytes]]    generated key and salt required to generate it
     function kdf( password_in )
     {
-        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BITS / 8 );
+        return pbkdf2_hmac( password_in, PBKDF2_HMAC_ITERATIONS );
+    }
+
+    private function pbkdf2_hmac( password_in, iterations )
+    {
+        // generate first iteration
         var sha_256 = new Cryptography.Hash(
             {
                 :algorithm => Cryptography.HASH_SHA256
             } );
+
+        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
 
         var password_bytes = StrUtl.convertEncodedString( password_in,
             {
@@ -96,8 +117,13 @@ module Crypto
             } );
         var input = password_bytes.addAll( kdf_salt );
         sha_256.update( input );
+
         var key = sha_256.digest();
 
-        return [kdf_salt, key];
+        // generate return data
+        var ret_val = new [KDF_RET_SIZE];
+        ret_val[KDF_RET_KEY]    = key;
+        ret_val[KDF_RET_SALT]   = kdf_salt;
+        return ret_val;
     }
 }

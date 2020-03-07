@@ -1,5 +1,6 @@
 using Toybox.Cryptography   as Cryptography;
 using Toybox.StringUtil     as StrUtl;
+using Toybox.System as Sys;
 
 module Crypto
 {
@@ -14,7 +15,7 @@ module Crypto
     const IV_SIZE_BYTES         = 16;
     const KDF_SALT_SIZE_BYTES   = 16;
 
-    const PBKDF2_HMAC_ITERATIONS = 10000;
+    const PBKDF2_HMAC_ITERATIONS = 150;
 
     // desc: adds padding to AES
     // inputs:
@@ -100,30 +101,77 @@ module Crypto
         return pbkdf2_hmac( password_in, PBKDF2_HMAC_ITERATIONS );
     }
 
+    // TODO support outputs larger than 256b
     private function pbkdf2_hmac( password_in, iterations )
     {
-        // generate first iteration
-        var sha_256 = new Cryptography.Hash(
-            {
-                :algorithm => Cryptography.HASH_SHA256
-            } );
-
-        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
-
         var password_bytes = StrUtl.convertEncodedString( password_in,
             {
                 :fromRepresentation => StrUtl.REPRESENTATION_STRING_PLAIN_TEXT,
                 :toRepresentation   => StrUtl.REPRESENTATION_BYTE_ARRAY,
             } );
-        var input = password_bytes.addAll( kdf_salt );
-        sha_256.update( input );
 
-        var key = sha_256.digest();
+        // generate first iteration
+        var sha_256 = new Cryptography.HashBasedMessageAuthenticationCode(
+            {
+                :algorithm  => Cryptography.HASH_SHA256,
+                :key        => password_bytes
+            } );
+
+        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
+        sha_256.update( kdf_salt );
+
+        // concatenation of salt and block number
+        var int_32b = [0, 0, 0, 1]b;
+        sha_256.update( int_32b );
+
+        var t = sha_256.digest();
+        var u = []b.addAll( t );
+
+        // iterations starting at 1 because of the initial setup
+        for( var i = 1; i < iterations; ++i )
+        {
+            // hash the hash then xor it with the previous hash
+            sha_256.update( u );
+            u = sha_256.digest();
+            t = byteArrayXOR( t, u );
+        }
 
         // generate return data
         var ret_val = new [KDF_RET_SIZE];
-        ret_val[KDF_RET_KEY]    = key;
+        ret_val[KDF_RET_KEY]    = t;
         ret_val[KDF_RET_SALT]   = kdf_salt;
         return ret_val;
     }
+
+    // desc: returns the xor of both byte arrays
+    // TODO handle arrays of different sizes
+    // inputs:
+    // - array_0    [bytes] first array
+    // - array_1    [bytes] second array
+    // returns:
+    // - [bytes]    XOR result
+    function byteArrayXOR( array_0, array_1 )
+    {
+        var result = new [array_0.size()]b;
+
+        for( var i = 0; i < array_0.size(); ++i )
+        {
+            result[i] = array_0[i] ^ array_1[i];
+        }
+
+        return result;
+    }
+
+    // desc: converts bytes to hex
+    function bytesToHex( bytes_in )
+    {
+        var converted_hex = StrUtl.convertEncodedString( bytes_in,
+            {
+                :fromRepresentation => StrUtl.REPRESENTATION_BYTE_ARRAY,
+                :toRepresentation   => StrUtl.REPRESENTATION_STRING_HEX
+            } );
+
+        return converted_hex;
+    }
+
 }

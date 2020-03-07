@@ -65,17 +65,29 @@ module Crypto
         return generated_iv.addAll( encrypted_data );
     }
 
+    // desc: does same work as encrypt just handles KDF salt
+    // inputs:
+    // - text_in        [str]   string to encrypt
+    // - key_in         [bytes] key to encrypt data with
+    // - kdf_salt_in    [bytes] salt used in generation of key
+    // returns:
+    // - [bytes]    encrypted cypher text
+    function encryptWithKDF( text_in, key_in, kdf_salt_in )
+    {
+        return kdf_salt_in.addAll( encrypt( text_in, key_in ) );
+    }
+
     // desc: decrypts plain text
     // inputs:
-    // - encrypted_data_in  [bytes] string to decrypt
-    // - key_in             [bytes] key to encrypt data with
+    // - cipher_text_in [bytes] string to decrypt
+    // - key_in         [bytes] key to decrypt data with
     // returns:
     // - [bytes]    decrypted cypher text
-    function decrypt( encrypted_data_in, key_in )
+    function decrypt( cipher_text_in, key_in )
     {
         //get iv
-        var data_iv         = encrypted_data_in.slice( 0, IV_SIZE_BYTES );
-        var encrypted_data  = encrypted_data_in.slice( IV_SIZE_BYTES, encrypted_data_in.size() );
+        var data_iv         = cipher_text_in.slice( 0, IV_SIZE_BYTES );
+        var encrypted_data  = cipher_text_in.slice( IV_SIZE_BYTES, cipher_text_in.size() );
 
         var aes_256_cipher = new Cryptography.Cipher(
             {
@@ -91,20 +103,58 @@ module Crypto
         return decrypted_data.slice( 0, -padding_length );
     }
 
-    // desc: generates a cryptographically secure key from a passphrase
+    // desc: does same work as decrypt just handles generation of KDF
+    //       from stored salt and user password
     // inputs:
-    // - password_in  [string]  string to turn into a key
+    // - cipher_text    [bytes]     string to decrypt
+    // - password       [string]    string to turn into a key
+    // returns:
+    // - [bytes]    encrypted cypher text
+    function decryptWithPass( cipher_text, password )
+    {
+        var kdf_salt = cipher_text.slice( 0, KDF_SALT_SIZE_BYTES );
+        var remaining_cipher = cipher_text.slice( KDF_SALT_SIZE_BYTES, cipher_text.size() );
+
+        var key = KDF( password, kdf_salt );
+
+        return decrypt( remaining_cipher, key );
+    }
+
+    // desc: same as kdfGenerate, just allows for input of salt
+    // TODO: currently limited to ~150 runs without task scheduler integration
+    // inputs:
+    // - password   [string]    string to turn into a key
+    // - salt       [bytes]     salt used in KDF creation process
     // returns:
     // - [[bytes], [bytes]]    generated key and salt required to generate it
-    function kdf( password_in )
+    function KDF( password, salt )
     {
-        return pbkdf2_hmac( password_in, PBKDF2_HMAC_ITERATIONS );
+        return pbkdf2_hmac( password, salt, PBKDF2_HMAC_ITERATIONS );
+    }
+
+    // desc: generates a cryptographically secure key from a passphrase
+    // TODO: currently limited to ~150 runs without task scheduler integration
+    // inputs:
+    // - password  [string]  string to turn into a key
+    // returns:
+    // - [[bytes], [bytes]]    generated key and salt required to generate it
+    function KDFGenerate( password )
+    {
+        var generated_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
+        return pbkdf2_hmac( password, generated_salt, PBKDF2_HMAC_ITERATIONS );
     }
 
     // TODO support outputs larger than 256b
-    private function pbkdf2_hmac( password_in, iterations )
+    // desc: PBKDF2 generates a cryptographically secure key from a ascii based password
+    // inputs:
+    // - password   [string]    password to generate key from
+    // - salt       [bytes]     salt used in key derivation process
+    // - iterations [int]       number of times to run the PRF
+    // returns:
+    // - [bytes]    derived key
+    private function pbkdf2_hmac( password, salt, iterations )
     {
-        var password_bytes = StrUtl.convertEncodedString( password_in,
+        var password_bytes = StrUtl.convertEncodedString( password,
             {
                 :fromRepresentation => StrUtl.REPRESENTATION_STRING_PLAIN_TEXT,
                 :toRepresentation   => StrUtl.REPRESENTATION_BYTE_ARRAY,
@@ -117,13 +167,14 @@ module Crypto
                 :key        => password_bytes
             } );
 
-        var kdf_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
-        sha_256.update( kdf_salt );
+        // update with salt
+        sha_256.update( salt );
 
         // concatenation of salt and block number
         var int_32b = [0, 0, 0, 1]b;
         sha_256.update( int_32b );
 
+        // get initial digest (round 1)
         var t = sha_256.digest();
         var u = []b.addAll( t );
 
@@ -139,7 +190,7 @@ module Crypto
         // generate return data
         var ret_val = new [KDF_RET_SIZE];
         ret_val[KDF_RET_KEY]    = t;
-        ret_val[KDF_RET_SALT]   = kdf_salt;
+        ret_val[KDF_RET_SALT]   = salt;
         return ret_val;
     }
 
@@ -174,4 +225,15 @@ module Crypto
         return converted_hex;
     }
 
+    // desc: converts bytes to hex
+    function bytesTo64( bytes_in )
+    {
+        var converted_hex = StrUtl.convertEncodedString( bytes_in,
+            {
+                :fromRepresentation => StrUtl.REPRESENTATION_BYTE_ARRAY,
+                :toRepresentation   => StrUtl.REPRESENTATION_STRING_BASE64
+            } );
+
+        return converted_hex;
+    }
 }

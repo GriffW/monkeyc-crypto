@@ -115,7 +115,7 @@ module Crypto
         var kdf_salt = cipher_text.slice( 0, KDF_SALT_SIZE_BYTES );
         var remaining_cipher = cipher_text.slice( KDF_SALT_SIZE_BYTES, cipher_text.size() );
 
-        var key = KDF( password, kdf_salt );
+        var key = KDF( password, kdf_salt )[KDF_RET_KEY];
 
         return decrypt( remaining_cipher, key );
     }
@@ -214,9 +214,9 @@ module Crypto
     }
 
     // desc: converts bytes to hex
-    function bytesToHex( bytes_in )
+    function bytesToHex( bytes )
     {
-        var converted_hex = StrUtl.convertEncodedString( bytes_in,
+        var converted_hex = StrUtl.convertEncodedString( bytes,
             {
                 :fromRepresentation => StrUtl.REPRESENTATION_BYTE_ARRAY,
                 :toRepresentation   => StrUtl.REPRESENTATION_STRING_HEX
@@ -226,14 +226,37 @@ module Crypto
     }
 
     // desc: converts bytes to hex
-    function bytesTo64( bytes_in )
+    function bytesTo64( bytes )
     {
-        var converted_hex = StrUtl.convertEncodedString( bytes_in,
+        var converted_hex = StrUtl.convertEncodedString( bytes,
             {
                 :fromRepresentation => StrUtl.REPRESENTATION_BYTE_ARRAY,
                 :toRepresentation   => StrUtl.REPRESENTATION_STRING_BASE64
             } );
 
         return converted_hex;
+    }
+
+    // desc: converts hex to bytes
+    function hexToBytes( hex )
+    {
+        var converted_bytes = StrUtl.convertEncodedString( hex,
+            {
+                :fromRepresentation => StrUtl.REPRESENTATION_STRING_HEX,
+                :toRepresentation   => StrUtl.REPRESENTATION_BYTE_ARRAY
+            } );
+
+        return converted_bytes;
+    }
+
+    function bytesToString( bytes )
+    {
+        var converted_string = StrUtl.convertEncodedString( bytes,
+            {
+                :fromRepresentation => StrUtl.REPRESENTATION_BYTE_ARRAY,
+                :toRepresentation   => StrUtl.REPRESENTATION_STRING_PLAIN_TEXT
+            } );
+
+        return converted_string;
     }
 }

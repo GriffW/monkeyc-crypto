@@ -141,7 +141,7 @@ module Crypto
     function KDFGenerate( password )
     {
         var generated_salt = Cryptography.randomBytes( KDF_SALT_SIZE_BYTES );
-        return pbkdf2_hmac( password, generated_salt, PBKDF2_HMAC_ITERATIONS );
+        return PBKDF2_HMAC( password, generated_salt, PBKDF2_HMAC_ITERATIONS );
     }
 
     // TODO support outputs larger than 256b
@@ -152,7 +152,7 @@ module Crypto
     // - iterations [int]       number of times to run the PRF
     // returns:
     // - [bytes]    derived key
-    private function pbkdf2_hmac( password, salt, iterations )
+    private function PBKDF2_HMAC( password, salt, iterations )
     {
         var password_bytes = StrUtl.convertEncodedString( password,
             {

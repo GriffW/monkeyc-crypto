@@ -130,7 +130,7 @@ module Crypto
     // - [[bytes], [bytes]]    generated key and salt required to generate it
     function KDF( password, salt )
     {
-        return pbkdf2_hmac( password, salt, PBKDF2_HMAC_ITERATIONS );
+        return PBKDF2_HMAC( password, salt, PBKDF2_HMAC_ITERATIONS );
     }
 
     // desc: generates a cryptographically secure key from a passphrase

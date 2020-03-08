@@ -78,6 +78,7 @@ module Crypto
     }
 
     // desc: decrypts plain text
+    // TODO: seems to have non-deterministic behavior when decryption fails
     // inputs:
     // - cipher_text_in [bytes] string to decrypt
     // - key_in         [bytes] key to decrypt data with
